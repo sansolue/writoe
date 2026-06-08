@@ -42,5 +42,11 @@ struct ContentView: View {
         }
         .navigationTitle(store.novel.title)
         .navigationSubtitle(store.fileURL?.deletingLastPathComponent().path(percentEncoded: false) ?? "")
+        .sheet(isPresented: Binding(
+            get: { store.showExportSheet },
+            set: { store.showExportSheet = $0 }
+        )) {
+            ExportSheet().environment(store)
+        }
     }
 }

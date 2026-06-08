@@ -35,7 +35,7 @@ struct WritoeApp: App {
                     .disabled(store.fileURL == nil)
 
                 Button("Export…") {
-                    ExportService.showExportPanel(for: store.novel)
+                    store.showExportSheet = true
                 }
                 .keyboardShortcut("E", modifiers: [.command, .shift])
                 .disabled(store.fileURL == nil)

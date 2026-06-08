@@ -37,7 +37,11 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 460, height: 420)
-        .onChange(of: store.novel.title) { _, _ in store.save() }
-        .onChange(of: store.novel.dailyWordGoal) { _, _ in store.save() }
+        .onChange(of: store.novel.title)        { _, _ in store.save() }
+        .onChange(of: store.novel.author)       { _, _ in store.save() }
+        .onChange(of: store.novel.genre)        { _, _ in store.save() }
+        .onChange(of: store.novel.synopsis)     { _, _ in store.save() }
+        .onChange(of: store.novel.dailyWordGoal){ _, _ in store.save() }
+        .onChange(of: store.aiAPIKey)           { _, _ in store.saveAPIKey() }
     }
 }

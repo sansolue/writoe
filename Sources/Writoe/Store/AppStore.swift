@@ -15,12 +15,18 @@ final class AppStore {
 
     var onProjectSaved: ((Novel, URL) -> Void)?
     var savedFlash: Bool = false
+    var showExportSheet: Bool = false
 
     init() {
         loadTodayCount()
+        aiAPIKey = UserDefaults.standard.string(forKey: "anthropicAPIKey") ?? ""
         if let last = Self.lastUsedURL, FileManager.default.fileExists(atPath: last.path) {
             loadProject(from: last)
         }
+    }
+
+    func saveAPIKey() {
+        UserDefaults.standard.set(aiAPIKey, forKey: "anthropicAPIKey")
     }
 
     // MARK: - Project Lifecycle
