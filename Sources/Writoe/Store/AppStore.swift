@@ -1,6 +1,10 @@
 import Foundation
 import Observation
 
+enum MainView {
+    case editor, corkboard, characters
+}
+
 @Observable
 final class AppStore {
     var novel: Novel = Novel()
@@ -9,7 +13,7 @@ final class AppStore {
     var selectedSceneID: UUID?
     var selectedCharacterID: UUID?
     var isDistractionFreeMode: Bool = false
-    var showCharacters: Bool = false
+    var activeView: MainView = .editor
     var todayWordCount: Int = 0
     var aiAPIKey: String = ""
 
@@ -17,8 +21,10 @@ final class AppStore {
     var savedFlash: Bool = false
     var showExportSheet: Bool = false
     var showGlobalFind: Bool = false
-    var showCorkboard: Bool = false
     var writingTheme: WritingTheme = .system
+
+    private var saveDebounceTask: Task<Void, Never>?
+    private var flashTask: Task<Void, Never>?
 
     func saveTheme() {
         UserDefaults.standard.set(writingTheme.rawValue, forKey: "writingTheme")
@@ -54,7 +60,7 @@ final class AppStore {
         selectedChapterID = novel.chapters.first?.id
         selectedSceneID = novel.chapters.first?.scenes.first?.id
         selectedCharacterID = nil
-        showCharacters = false
+        activeView = .editor
         isDistractionFreeMode = false
         Self.lastUsedURL = url
         // Only create a new file on disk; never auto-overwrite an existing file
@@ -63,13 +69,14 @@ final class AppStore {
     }
 
     func closeProject() {
+        saveDebounceTask?.cancel()
         save()
         fileURL = nil
         novel = Novel()
         selectedChapterID = nil
         selectedSceneID = nil
         selectedCharacterID = nil
-        showCharacters = false
+        activeView = .editor
     }
 
     // MARK: - Scene Content
@@ -83,12 +90,11 @@ final class AppStore {
     func updateSceneContent(_ content: String) {
         guard let sceneID = selectedSceneID,
               let location = novel.findScene(id: sceneID) else { return }
-        let old = novel.chapters[location.chapterIndex].scenes[location.sceneIndex].content
+        let oldCount = novel.chapters[location.chapterIndex].scenes[location.sceneIndex].wordCount
         novel.chapters[location.chapterIndex].scenes[location.sceneIndex].updateContent(content)
-        let delta = content.split(separator: " ").filter { !$0.isEmpty }.count
-                  - old.split(separator: " ").filter { !$0.isEmpty }.count
+        let delta = novel.chapters[location.chapterIndex].scenes[location.sceneIndex].wordCount - oldCount
         if delta > 0 { todayWordCount += delta }
-        save()
+        scheduleSave()
     }
 
     func updateSceneTitle(_ title: String) {
@@ -102,13 +108,13 @@ final class AppStore {
         guard let sceneID = selectedSceneID,
               let location = novel.findScene(id: sceneID) else { return }
         novel.chapters[location.chapterIndex].scenes[location.sceneIndex].synopsis = synopsis
-        save()
+        scheduleSave()
     }
 
     func updateSceneSynopsis(_ synopsis: String, for sceneID: UUID) {
         guard let location = novel.findScene(id: sceneID) else { return }
         novel.chapters[location.chapterIndex].scenes[location.sceneIndex].synopsis = synopsis
-        save()
+        scheduleSave()
     }
 
     // MARK: - Chapter/Scene Mutations
@@ -166,7 +172,15 @@ final class AppStore {
         guard let idx = novel.chapters.firstIndex(where: { $0.id == chapterID }) else { return }
         novel.chapters[idx].deleteScene(id: id)
         if selectedSceneID == id {
-            selectedSceneID = novel.chapters[idx].scenes.first?.id
+            if let next = novel.chapters[idx].scenes.first {
+                // Chapter still has scenes — stay in the same chapter
+                selectedSceneID = next.id
+            } else {
+                // Chapter is now empty — fall back to the first non-empty chapter
+                let fallback = novel.chapters.first(where: { !$0.scenes.isEmpty })
+                selectedChapterID = fallback?.id
+                selectedSceneID   = fallback?.scenes.first?.id
+            }
         }
         save()
     }
@@ -195,6 +209,15 @@ final class AppStore {
 
     // MARK: - Persistence
 
+    private func scheduleSave() {
+        saveDebounceTask?.cancel()
+        saveDebounceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            self?.save()
+        }
+    }
+
     func save() {
         guard let url = fileURL else { return }
         do {
@@ -202,10 +225,12 @@ final class AppStore {
             try data.write(to: url, options: .atomic)
             Self.lastUsedURL = url
             onProjectSaved?(novel, url)
-            Task { @MainActor in
-                savedFlash = true
+            flashTask?.cancel()
+            flashTask = Task { @MainActor [weak self] in
+                self?.savedFlash = true
                 try? await Task.sleep(for: .seconds(2))
-                savedFlash = false
+                guard !Task.isCancelled else { return }
+                self?.savedFlash = false
             }
         } catch {
             print("Save failed: \(error)")

@@ -136,7 +136,7 @@ struct GlobalFindView: View {
     private func navigate(to result: FindResult) {
         store.selectedChapterID = result.chapterID
         store.selectedSceneID   = result.sceneID
-        store.showCharacters    = false
+        store.activeView        = .editor
         store.showGlobalFind    = false
     }
 

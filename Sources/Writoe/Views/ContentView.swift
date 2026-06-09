@@ -19,11 +19,12 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
         } detail: {
             Group {
-                if store.showCharacters {
+                switch store.activeView {
+                case .characters:
                     CharacterListView()
-                } else if store.showCorkboard {
+                case .corkboard:
                     CorkboardView()
-                } else {
+                case .editor:
                     VStack(spacing: 0) {
                         if store.showGlobalFind {
                             GlobalFindView()
@@ -37,15 +38,15 @@ struct ContentView: View {
                 }
             }
             .toolbar {
-                // View mode toggle (Editor | Corkboard)
-                if !store.showCharacters {
+                // View mode toggle (Editor | Corkboard) — hidden in Characters view
+                if store.activeView != .characters {
                     ToolbarItem(placement: .navigation) {
                         Picker("View", selection: Binding(
-                            get: { store.showCorkboard },
-                            set: { store.showCorkboard = $0 }
+                            get: { store.activeView },
+                            set: { store.activeView = $0 }
                         )) {
-                            Label("Editor",    systemImage: "doc.text")           .tag(false)
-                            Label("Corkboard", systemImage: "rectangle.3.group")  .tag(true)
+                            Label("Editor",    systemImage: "doc.text")          .tag(MainView.editor)
+                            Label("Corkboard", systemImage: "rectangle.3.group") .tag(MainView.corkboard)
                         }
                         .pickerStyle(.segmented)
                         .help("Switch between editor and corkboard view")
@@ -59,11 +60,11 @@ struct ContentView: View {
                         Image(systemName: "sidebar.trailing")
                     }
                     .help("Toggle Inspector")
-                    .disabled(store.showCorkboard)
+                    .disabled(store.activeView == .corkboard)
                 }
             }
             .inspector(isPresented: Binding(
-                get: { showInspector && !store.showCorkboard },
+                get: { showInspector && store.activeView != .corkboard },
                 set: { showInspector = $0 }
             )) {
                 InspectorView()

@@ -58,10 +58,15 @@ struct WritingTextView: NSViewRepresentable {
                         || c.lastTheme    != theme
 
         if sceneChanged {
-            c.lastSceneID = sceneID
+            c.lastSceneID  = sceneID
+            c.lastFontName = fontName
+            c.lastFontSize = fontSize
+            c.lastIsRTL    = isRTL
+            c.lastTheme    = theme
             tv.string = text
             applyStyle(to: tv, scrollView: scrollView)
             applyStyleToStorage(tv)
+            tv.scrollToBeginningOfDocument(nil)
         } else if styleChanged {
             c.lastFontName = fontName
             c.lastFontSize = fontSize

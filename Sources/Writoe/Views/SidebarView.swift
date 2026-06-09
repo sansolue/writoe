@@ -57,12 +57,12 @@ struct SidebarView: View {
                 }
                 .onTapGesture {
                     store.selectedCharacterID = character.id
-                    store.showCharacters = true
+                    store.activeView = .characters
                 }
             }
             Button {
                 store.addCharacter(named: "New Character")
-                store.showCharacters = true
+                store.activeView = .characters
             } label: {
                 Label("Add Character", systemImage: "plus")
                     .foregroundStyle(.secondary)
@@ -239,7 +239,7 @@ struct SceneRowView: View {
             // First click or fast double-click → just select
             store.selectedChapterID = chapterID
             store.selectedSceneID = scene.id
-            store.showCharacters = false
+            store.activeView = .editor
         }
     }
 

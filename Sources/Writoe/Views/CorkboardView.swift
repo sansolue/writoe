@@ -237,8 +237,7 @@ private struct SceneCard: View {
     private func openInEditor() {
         store.selectedChapterID = chapter.id
         store.selectedSceneID   = scene.id
-        store.showCharacters    = false
-        store.showCorkboard     = false
+        store.activeView        = .editor
     }
 }
 
