@@ -2,41 +2,33 @@ import SwiftUI
 
 struct DistractionFreeView: View {
     @Environment(AppStore.self) var store
-    @State private var text: String = ""
     @State private var showControls = false
-    @FocusState private var focused: Bool
 
     var body: some View {
         ZStack {
-            Color(nsColor: .textBackgroundColor).ignoresSafeArea()
+            store.writingTheme.swiftUIBackground.ignoresSafeArea()
 
-            TextEditor(text: $text)
-                .font(.system(size: 18, weight: .regular, design: .serif))
-                .lineSpacing(8)
-                .frame(maxWidth: 680)
-                .padding(.vertical, 60)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .focused($focused)
-                .onChange(of: text) { _, newValue in
-                    store.updateSceneContent(newValue)
-                }
-
-            if showControls {
-                overlayControls
+            // Centered writing column, max 680pt wide
+            GeometryReader { geo in
+                let hPad = max(60, (geo.size.width - 680) / 2)
+                WritingTextView(
+                    text: Binding(get: { store.selectedScene?.content ?? "" }, set: { _ in }),
+                    sceneID: store.selectedSceneID,
+                    fontName: store.novel.fontName,
+                    fontSize: store.novel.fontSize + 2,
+                    isRTL: store.novel.isRTL,
+                    spellCheckLanguage: store.novel.writingLanguage,
+                    theme: store.writingTheme,
+                    horizontalPadding: hPad,
+                    verticalPadding: 60,
+                    onTextChange: { store.updateSceneContent($0) }
+                )
             }
-        }
-        .onAppear {
-            text = store.selectedScene?.content ?? ""
-            focused = true
-        }
-        .onChange(of: store.selectedSceneID) { _, _ in
-            text = store.selectedScene?.content ?? ""
+
+            if showControls { overlayControls }
         }
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showControls = hovering
-            }
+            withAnimation(.easeInOut(duration: 0.2)) { showControls = hovering }
         }
         .ignoresSafeArea()
     }

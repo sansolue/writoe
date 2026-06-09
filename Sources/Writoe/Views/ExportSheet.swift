@@ -78,7 +78,7 @@ struct ExportSheet: View {
                 // EPUB options
                 if format.hasEPUBOptions {
                     Divider().padding(.vertical, 16)
-                    EPUBOptionsPanel(options: options)
+                    EPUBOptionsPanel(options: $options)
                 }
 
                 // DOCX options
@@ -221,7 +221,7 @@ private struct FormatRow: View {
 // MARK: - EPUB options panel
 
 private struct EPUBOptionsPanel: View {
-    var options: ExportOptions
+    @Binding var options: ExportOptions
 
     var body: some View {
         OptionsSection(title: "E-Book Details") {
@@ -272,42 +272,30 @@ private struct EPUBOptionsPanel: View {
             HStack {
                 Text("Language")
                 Spacer()
-                TextField("en", text: Binding(
-                    get: { options.language },
-                    set: { options.language = $0 }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 80)
+                TextField("en", text: $options.language)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 80)
             }
             HStack {
                 Text("Publisher")
                 Spacer()
-                TextField("Optional", text: Binding(
-                    get: { options.publisher },
-                    set: { options.publisher = $0 }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 200)
+                TextField("Optional", text: $options.publisher)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 200)
             }
             HStack {
                 Text("Rights")
                 Spacer()
-                TextField("Optional", text: Binding(
-                    get: { options.rights },
-                    set: { options.rights = $0 }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 200)
+                TextField("Optional", text: $options.rights)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 200)
             }
             HStack {
                 Text("ISBN")
                 Spacer()
-                TextField("Optional", text: Binding(
-                    get: { options.isbn },
-                    set: { options.isbn = $0 }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 160)
+                TextField("Optional", text: $options.isbn)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 160)
             }
         }
     }

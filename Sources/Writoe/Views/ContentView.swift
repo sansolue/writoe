@@ -21,11 +21,37 @@ struct ContentView: View {
             Group {
                 if store.showCharacters {
                     CharacterListView()
+                } else if store.showCorkboard {
+                    CorkboardView()
                 } else {
-                    EditorView()
+                    VStack(spacing: 0) {
+                        if store.showGlobalFind {
+                            GlobalFindView()
+                                .frame(height: 280)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                            Divider()
+                        }
+                        EditorView()
+                    }
+                    .animation(.easeInOut(duration: 0.2), value: store.showGlobalFind)
                 }
             }
             .toolbar {
+                // View mode toggle (Editor | Corkboard)
+                if !store.showCharacters {
+                    ToolbarItem(placement: .navigation) {
+                        Picker("View", selection: Binding(
+                            get: { store.showCorkboard },
+                            set: { store.showCorkboard = $0 }
+                        )) {
+                            Label("Editor",    systemImage: "doc.text")           .tag(false)
+                            Label("Corkboard", systemImage: "rectangle.3.group")  .tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        .help("Switch between editor and corkboard view")
+                    }
+                }
+
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         withAnimation { showInspector.toggle() }
@@ -33,9 +59,13 @@ struct ContentView: View {
                         Image(systemName: "sidebar.trailing")
                     }
                     .help("Toggle Inspector")
+                    .disabled(store.showCorkboard)
                 }
             }
-            .inspector(isPresented: $showInspector) {
+            .inspector(isPresented: Binding(
+                get: { showInspector && !store.showCorkboard },
+                set: { showInspector = $0 }
+            )) {
                 InspectorView()
                     .inspectorColumnWidth(min: 180, ideal: 220, max: 260)
             }

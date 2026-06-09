@@ -72,6 +72,10 @@ struct WritoeApp: App {
 
                 Divider()
 
+                Button("Find in Novel…") { store.showGlobalFind.toggle() }
+                    .keyboardShortcut("F", modifiers: [.command, .shift])
+                    .disabled(store.fileURL == nil)
+
                 Button("Distraction-Free Mode") { store.isDistractionFreeMode.toggle() }
                     .keyboardShortcut("F", modifiers: [.command, .control])
                     .disabled(store.fileURL == nil)

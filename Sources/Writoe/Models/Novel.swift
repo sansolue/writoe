@@ -9,8 +9,14 @@ struct Novel: Codable {
     var chapters: [Chapter] = []
     var characters: [Character] = []
     var dailyWordGoal: Int = 1000
+    var writingLanguage: String = "en"
+    var fontName: String = "Georgia"
+    var fontSize: Double = 16
     var createdAt: Date = Date()
     var modifiedAt: Date = Date()
+
+    var isRTL: Bool { WritingLanguage.find(id: writingLanguage).isRTL }
+    var writingLanguageModel: WritingLanguage { WritingLanguage.find(id: writingLanguage) }
 
     var totalWordCount: Int {
         chapters.reduce(0) { $0 + $1.wordCount }

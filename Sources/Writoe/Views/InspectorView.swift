@@ -62,20 +62,15 @@ struct InspectorView: View {
 
 private struct SceneNotesField: View {
     @Environment(AppStore.self) var store
-    @State private var synopsis: String = ""
 
     var body: some View {
-        TextEditor(text: $synopsis)
-            .font(.caption)
-            .frame(minHeight: 80)
-            .padding(4)
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-            .onAppear { synopsis = store.selectedScene?.synopsis ?? "" }
-            .onChange(of: store.selectedSceneID) { _, _ in
-                synopsis = store.selectedScene?.synopsis ?? ""
-            }
-            .onChange(of: synopsis) { _, newValue in
-                store.updateSceneSynopsis(newValue)
-            }
+        TextEditor(text: Binding(
+            get: { store.selectedScene?.synopsis ?? "" },
+            set: { store.updateSceneSynopsis($0) }
+        ))
+        .font(.caption)
+        .frame(minHeight: 80)
+        .padding(4)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
     }
 }

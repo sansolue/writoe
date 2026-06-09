@@ -16,10 +16,19 @@ final class AppStore {
     var onProjectSaved: ((Novel, URL) -> Void)?
     var savedFlash: Bool = false
     var showExportSheet: Bool = false
+    var showGlobalFind: Bool = false
+    var showCorkboard: Bool = false
+    var writingTheme: WritingTheme = .system
+
+    func saveTheme() {
+        UserDefaults.standard.set(writingTheme.rawValue, forKey: "writingTheme")
+    }
 
     init() {
         loadTodayCount()
         aiAPIKey = UserDefaults.standard.string(forKey: "anthropicAPIKey") ?? ""
+        let themeRaw = UserDefaults.standard.string(forKey: "writingTheme") ?? "system"
+        writingTheme = WritingTheme(rawValue: themeRaw) ?? .system
         if let last = Self.lastUsedURL, FileManager.default.fileExists(atPath: last.path) {
             loadProject(from: last)
         }
@@ -32,6 +41,7 @@ final class AppStore {
     // MARK: - Project Lifecycle
 
     func loadProject(from url: URL) {
+        let fileAlreadyExists = FileManager.default.fileExists(atPath: url.path)
         if let data = try? Data(contentsOf: url),
            let saved = try? JSONDecoder().decode(Novel.self, from: data) {
             novel = saved
@@ -47,7 +57,9 @@ final class AppStore {
         showCharacters = false
         isDistractionFreeMode = false
         Self.lastUsedURL = url
-        save()
+        // Only create a new file on disk; never auto-overwrite an existing file
+        // (e.g. one that failed to decode) — the user's data may still be recoverable.
+        if !fileAlreadyExists { save() }
     }
 
     func closeProject() {
@@ -89,6 +101,12 @@ final class AppStore {
     func updateSceneSynopsis(_ synopsis: String) {
         guard let sceneID = selectedSceneID,
               let location = novel.findScene(id: sceneID) else { return }
+        novel.chapters[location.chapterIndex].scenes[location.sceneIndex].synopsis = synopsis
+        save()
+    }
+
+    func updateSceneSynopsis(_ synopsis: String, for sceneID: UUID) {
+        guard let location = novel.findScene(id: sceneID) else { return }
         novel.chapters[location.chapterIndex].scenes[location.sceneIndex].synopsis = synopsis
         save()
     }
