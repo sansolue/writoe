@@ -98,9 +98,20 @@ private struct SceneCard: View {
     @Binding var draggingID: UUID?
     @Binding var highlightedID: UUID?
 
-    @State private var titleDraft    = ""
-    @State private var synopsisDraft = ""
+    @State private var titleDraft: String
+    @State private var synopsisDraft: String
     @FocusState private var synopsisFocused: Bool
+
+    init(scene: Scene, chapter: Chapter, chapterIndex: Int,
+         draggingID: Binding<UUID?>, highlightedID: Binding<UUID?>) {
+        self.scene = scene
+        self.chapter = chapter
+        self.chapterIndex = chapterIndex
+        _draggingID = draggingID
+        _highlightedID = highlightedID
+        _titleDraft    = State(initialValue: scene.title)
+        _synopsisDraft = State(initialValue: scene.synopsis)
+    }
 
     private var isBeingDragged: Bool { draggingID == scene.id }
     private var isDropTarget:   Bool { highlightedID == scene.id }
@@ -176,11 +187,9 @@ private struct SceneCard: View {
         )
         .scaleEffect(isBeingDragged ? 0.97 : 1)
         .animation(.easeInOut(duration: 0.15), value: isBeingDragged)
-        .onAppear {
-            titleDraft    = scene.title
-            synopsisDraft = scene.synopsis
-        }
         // Keep local drafts in sync with external store mutations (e.g. sidebar rename).
+        // onAppear is intentionally absent — @State is seeded from scene in init() so
+        // first appearance is already correct, and LazyVGrid card recreation re-runs init.
         // The equality guard prevents a feedback loop: when the user types, the draft
         // writes to the store, the store updates scene, and this fires — but by then
         // the draft already equals the new scene value, so no re-assignment happens.

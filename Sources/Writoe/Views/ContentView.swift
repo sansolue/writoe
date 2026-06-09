@@ -71,6 +71,9 @@ struct ContentView: View {
                     .inspectorColumnWidth(min: 180, ideal: 220, max: 260)
             }
         }
+        .onChange(of: store.activeView) { _, newView in
+            if newView != .editor { store.showGlobalFind = false }
+        }
         .navigationTitle(store.novel.title)
         .navigationSubtitle(store.fileURL?.deletingLastPathComponent().path(percentEncoded: false) ?? "")
         .sheet(isPresented: Binding(

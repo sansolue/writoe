@@ -26,6 +26,10 @@ final class AppStore {
     private var saveDebounceTask: Task<Void, Never>?
     private var flashTask: Task<Void, Never>?
 
+    // One-entry cache so findScene is O(1) on the hot typing path.
+    // Cleared on any structural mutation to chapters or scenes.
+    private var cachedSceneLocation: (id: UUID, ci: Int, si: Int)?
+
     func saveTheme() {
         UserDefaults.standard.set(writingTheme.rawValue, forKey: "writingTheme")
     }
@@ -48,6 +52,7 @@ final class AppStore {
 
     func loadProject(from url: URL) {
         let fileAlreadyExists = FileManager.default.fileExists(atPath: url.path)
+        invalidateSceneCache()
         if let data = try? Data(contentsOf: url),
            let saved = try? JSONDecoder().decode(Novel.self, from: data) {
             novel = saved
@@ -70,6 +75,7 @@ final class AppStore {
 
     func closeProject() {
         saveDebounceTask?.cancel()
+        invalidateSceneCache()
         save()
         fileURL = nil
         novel = Novel()
@@ -83,37 +89,37 @@ final class AppStore {
 
     var selectedScene: Scene? {
         guard let sceneID = selectedSceneID,
-              let location = novel.findScene(id: sceneID) else { return nil }
-        return novel.chapters[location.chapterIndex].scenes[location.sceneIndex]
+              let loc = cachedFindScene(id: sceneID) else { return nil }
+        return novel.chapters[loc.chapterIndex].scenes[loc.sceneIndex]
     }
 
     func updateSceneContent(_ content: String) {
         guard let sceneID = selectedSceneID,
-              let location = novel.findScene(id: sceneID) else { return }
-        let oldCount = novel.chapters[location.chapterIndex].scenes[location.sceneIndex].wordCount
-        novel.chapters[location.chapterIndex].scenes[location.sceneIndex].updateContent(content)
-        let delta = novel.chapters[location.chapterIndex].scenes[location.sceneIndex].wordCount - oldCount
-        if delta > 0 { todayWordCount += delta }
+              let loc = cachedFindScene(id: sceneID) else { return }
+        let oldCount = novel.chapters[loc.chapterIndex].scenes[loc.sceneIndex].wordCount
+        novel.chapters[loc.chapterIndex].scenes[loc.sceneIndex].updateContent(content)
+        let delta = novel.chapters[loc.chapterIndex].scenes[loc.sceneIndex].wordCount - oldCount
+        todayWordCount = max(0, todayWordCount + delta)
         scheduleSave()
     }
 
     func updateSceneTitle(_ title: String) {
         guard let sceneID = selectedSceneID,
-              let location = novel.findScene(id: sceneID) else { return }
-        novel.chapters[location.chapterIndex].scenes[location.sceneIndex].title = title
+              let loc = cachedFindScene(id: sceneID) else { return }
+        novel.chapters[loc.chapterIndex].scenes[loc.sceneIndex].title = title
         save()
     }
 
     func updateSceneSynopsis(_ synopsis: String) {
         guard let sceneID = selectedSceneID,
-              let location = novel.findScene(id: sceneID) else { return }
-        novel.chapters[location.chapterIndex].scenes[location.sceneIndex].synopsis = synopsis
+              let loc = cachedFindScene(id: sceneID) else { return }
+        novel.chapters[loc.chapterIndex].scenes[loc.sceneIndex].synopsis = synopsis
         scheduleSave()
     }
 
     func updateSceneSynopsis(_ synopsis: String, for sceneID: UUID) {
-        guard let location = novel.findScene(id: sceneID) else { return }
-        novel.chapters[location.chapterIndex].scenes[location.sceneIndex].synopsis = synopsis
+        guard let loc = cachedFindScene(id: sceneID) else { return }
+        novel.chapters[loc.chapterIndex].scenes[loc.sceneIndex].synopsis = synopsis
         scheduleSave()
     }
 
@@ -121,6 +127,7 @@ final class AppStore {
 
     func addChapter() {
         novel.addChapter()
+        invalidateSceneCache()
         if let newChapter = novel.chapters.last {
             selectedChapterID = newChapter.id
             selectedSceneID = newChapter.scenes.first?.id
@@ -130,6 +137,7 @@ final class AppStore {
 
     func deleteChapter(id: UUID) {
         novel.deleteChapter(id: id)
+        invalidateSceneCache()
         if selectedChapterID == id {
             selectedChapterID = novel.chapters.first?.id
             selectedSceneID = novel.chapters.first?.scenes.first?.id
@@ -140,6 +148,7 @@ final class AppStore {
     func addScene(to chapterID: UUID) {
         guard let idx = novel.chapters.firstIndex(where: { $0.id == chapterID }) else { return }
         novel.chapters[idx].addScene()
+        invalidateSceneCache()
         selectedChapterID = chapterID
         selectedSceneID = novel.chapters[idx].scenes.last?.id
         save()
@@ -152,34 +161,40 @@ final class AppStore {
     }
 
     func renameScene(id: UUID, title: String) {
-        guard let location = novel.findScene(id: id) else { return }
-        novel.chapters[location.chapterIndex].scenes[location.sceneIndex].title = title
+        guard let loc = cachedFindScene(id: id) else { return }
+        novel.chapters[loc.chapterIndex].scenes[loc.sceneIndex].title = title
         save()
     }
 
     func moveChapters(from source: IndexSet, to destination: Int) {
         novel.moveChapters(from: source, to: destination)
+        invalidateSceneCache()
         save()
     }
 
     func moveScenes(from source: IndexSet, to destination: Int, in chapterID: UUID) {
         guard let idx = novel.chapters.firstIndex(where: { $0.id == chapterID }) else { return }
         novel.chapters[idx].moveScenes(from: source, to: destination)
+        invalidateSceneCache()
         save()
     }
 
     func deleteScene(id: UUID, from chapterID: UUID) {
         guard let idx = novel.chapters.firstIndex(where: { $0.id == chapterID }) else { return }
         novel.chapters[idx].deleteScene(id: id)
+        invalidateSceneCache()
         if selectedSceneID == id {
             if let next = novel.chapters[idx].scenes.first {
                 // Chapter still has scenes — stay in the same chapter
                 selectedSceneID = next.id
+            } else if let fallback = novel.chapters.first(where: { !$0.scenes.isEmpty }) {
+                // This chapter is empty — move to another chapter that has scenes
+                selectedChapterID = fallback.id
+                selectedSceneID   = fallback.scenes.first?.id
             } else {
-                // Chapter is now empty — fall back to the first non-empty chapter
-                let fallback = novel.chapters.first(where: { !$0.scenes.isEmpty })
-                selectedChapterID = fallback?.id
-                selectedSceneID   = fallback?.scenes.first?.id
+                // All chapters are empty — stay on this chapter so ⌘⌥N still works
+                selectedChapterID = novel.chapters[idx].id
+                selectedSceneID   = nil
             }
         }
         save()
@@ -204,7 +219,7 @@ final class AppStore {
     func updateCharacter(_ updated: Character) {
         guard let idx = novel.characters.firstIndex(where: { $0.id == updated.id }) else { return }
         novel.characters[idx] = updated
-        save()
+        scheduleSave()
     }
 
     // MARK: - Persistence
@@ -237,13 +252,26 @@ final class AppStore {
         }
     }
 
+    // MARK: - Scene cache
+
+    private func cachedFindScene(id: UUID) -> (chapterIndex: Int, sceneIndex: Int)? {
+        if let c = cachedSceneLocation, c.id == id {
+            return (c.ci, c.si)
+        }
+        guard let loc = novel.findScene(id: id) else { return nil }
+        cachedSceneLocation = (id, loc.chapterIndex, loc.sceneIndex)
+        return loc
+    }
+
+    private func invalidateSceneCache() {
+        cachedSceneLocation = nil
+    }
+
+    // MARK: - UserDefaults
+
     private static var lastUsedURL: URL? {
-        get {
-            UserDefaults.standard.url(forKey: "lastProjectURL")
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: "lastProjectURL")
-        }
+        get { UserDefaults.standard.url(forKey: "lastProjectURL") }
+        set { UserDefaults.standard.set(newValue, forKey: "lastProjectURL") }
     }
 
     private func loadTodayCount() {

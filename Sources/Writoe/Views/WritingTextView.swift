@@ -66,7 +66,12 @@ struct WritingTextView: NSViewRepresentable {
             tv.string = text
             applyStyle(to: tv, scrollView: scrollView)
             applyStyleToStorage(tv)
-            tv.scrollToBeginningOfDocument(nil)
+            // Defer scroll until AppKit has laid out the new content; calling
+            // scrollToBeginningOfDocument synchronously here runs before layout
+            // and would scroll to a stale geometry.
+            DispatchQueue.main.async {
+                tv.scrollToBeginningOfDocument(nil)
+            }
         } else if styleChanged {
             c.lastFontName = fontName
             c.lastFontSize = fontSize
